@@ -704,6 +704,7 @@ def auth_req():
                 request.endpoint != "signout" and \
                 request.endpoint != "auth" and \
                 request.endpoint != "register" and\
+                request.endpoint != 'drop_user' and\
                 "username" not in session :
             print("User not signed in - Attempted access: " + str(request.endpoint))
             if request.endpoint != "index":
@@ -755,13 +756,16 @@ def signout():
         session.pop("username")
     return redirect(url_for('signin'))
   
-
+""" 
+old Authentication
 @app.route('/auth', methods=['POST'])
 def auth():
-    """
+"""
+"""
     Authentication request
     @return: json object indicating verifying
-    """
+"""
+"""
     data = request.get_json()
     config = get_dashboard_conf()
     password = hashlib.sha256(data['password'].encode())
@@ -773,6 +777,7 @@ def auth():
         return jsonify({"status": True, "msg": ""})
     config.clear()
     return jsonify({"status": False, "msg": "Username or Password is incorrect."})
+"""
 
 
 """
@@ -1801,6 +1806,40 @@ def register():
     except:
         return jsonify({"status":400, "msg": "Data reading error"})
 
+@app.route('/drop_user', methods=['POST'])
+def drop_user():
+    data = request.get_json()
+    try:
+        id = data["id"]
+        check_user =  g.cur.execute("SELECT * FROM users WHERE id='%s'" % id).fetchall()
+        if len(check_user)== 0:
+            return jsonify({"status":400, "msg": "Incorrect id"})
+        else:
+            g.cur.execute("DELETE FROM users WHERE id='%s'" % id)
+            return jsonify({"status":200, "msg":"success"})
+    except:
+        return jsonify({"status":400, "msg": "Bad request"})
+
+@app.route('/auth', methods=['POST'])
+def auth():
+    data = request.get_json()
+    config = get_dashboard_conf()
+    try:
+        username = data['username']
+        password = hashlib.sha256(data['password'].encode())
+        get_user = g.cur.execute("SELECT username, password FROM users where username='%s'" % username).fetchall()
+        if len(get_user) == 0:
+            return jsonify({"status": 400, "msg": "Incorrect login"})
+        else:
+            if password.hexdigest() == get_user[0][1] \
+            and username == get_user[0][0]:
+                session['username'] = data['username']
+                session.permanent = True
+                config.clear()
+                return jsonify({"status": True, "msg": ""})
+    except:
+        return jsonify({"status": False, "msg": "Username or Password is incorrect."})
+
 
 import atexit
 @atexit.register 
@@ -1925,7 +1964,6 @@ def init_dashboard():
     Create dashboard default configuration.
     """
     
-
     # Set Default INI File
     if not os.path.isfile(DASHBOARD_CONF):
         open(DASHBOARD_CONF, "w+").close()
