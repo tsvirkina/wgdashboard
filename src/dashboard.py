@@ -704,7 +704,8 @@ def auth_req():
                 request.endpoint != "signout" and \
                 request.endpoint != "auth" and \
                 request.endpoint != "register" and\
-                request.endpoint != 'drop_user' and\
+                request.endpoint != "drop_user" and\
+                request.endpoint != "edit_user" and\
                 "username" not in session :
             print("User not signed in - Attempted access: " + str(request.endpoint))
             if request.endpoint != "index":
@@ -1819,6 +1820,29 @@ def drop_user():
             return jsonify({"status":200, "msg":"success"})
     except:
         return jsonify({"status":400, "msg": "Bad request"})
+
+@app.route('/edit_user', methods=['POST'])
+def edit_user():
+    data = request.get_json()
+    try:
+        id=data["id"]
+        old_value = g.cur.execute("SELECT username FROM users WHERE id='%s'" % id).fetchall()
+        if "username" in data and data["username"] != "":
+            username = data["username"]
+        elif "username" in data and data["username"] == "":
+            username = old_value[0][0]
+            return jsonify ({"status":400, "msg":"incorrect value"})
+        else:
+            username = old_value[0][0]
+        check_name = g.cur.execute("SELECT username FROM users WHERE username='%s' AND NOT id='%s'" % (data['username'], data['id'])).fetchall()
+        if len(check_name) > 0:
+            return jsonify ({"status":400, "msg":"User with the same username alredy exist"})
+        else:
+            g.cur.execute("UPDATE users SET username='%s' WHERE id='%s'" % (username, id))
+            return jsonify ({"status":200, "msg": f"new name: {username}"})
+    except:
+        return jsonify ({"status":400, "msg":"bad request"})
+
 
 @app.route('/auth', methods=['POST'])
 def auth():
